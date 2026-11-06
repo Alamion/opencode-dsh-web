@@ -1,5 +1,7 @@
 # OpenCode & DSH Web (Sidebar)
 
+![OpenCode & DSH Web — two web UIs in the VS Code sidebar](media/banner.png)
+
 Open the [OpenCode](https://opencode.ai) web UI and the DeepSeek Harness (DSH)
 web UI in the VS Code **secondary sidebar** (the right column, next to the
 Claude Code / Codex panels) — pre-authenticated, at your project and last chat,
@@ -11,6 +13,17 @@ Two webview panels:
   authenticating proxy, deep-linked to the last chat of the current folder.
 - **DSH** — the DeepSeek Harness web UI (`dsh --profile web`), either the local
   server or a Coder workspace app such as DUST, with automatic sign-in.
+
+## Screenshots
+
+<!-- Uncomment once real screenshots are committed under docs/screenshots/.
+![OpenCode panel in the VS Code sidebar](docs/screenshots/opencode.png)
+![DSH as a Coder workspace app](docs/screenshots/dsh-coder.png)
+![DSH workspace stopped state](docs/screenshots/dsh-stopped.png)
+-->
+
+Screenshots live in [`docs/screenshots`](docs/screenshots). See that folder for
+the shot list.
 
 ## Requirements
 

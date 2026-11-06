@@ -12,6 +12,10 @@
     "vscode": "^1.90.0"
   },
   "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "categories": [
     "Other"
   ],
