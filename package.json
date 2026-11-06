@@ -1,0 +1,302 @@
+{
+  "name": "opencode-dsh-web",
+  "displayName": "OpenCode & DSH Web (Sidebar)",
+  "description": "Open the OpenCode and DeepSeek Harness (DSH) web UIs in a VS Code sidebar - pre-authenticated, at your project and last chat, locally or as Coder workspace apps.",
+  "version": "0.1.0",
+  "publisher": "Alamion",
+  "license": "MIT",
+  "author": {
+    "name": "Alamion"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "opencode",
+    "deepseek",
+    "dsh",
+    "coder",
+    "sidebar",
+    "webview",
+    "ai",
+    "chat",
+    "claude-code"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Alamion/opencode-dsh-web.git"
+  },
+  "homepage": "https://github.com/Alamion/opencode-dsh-web#readme",
+  "bugs": {
+    "url": "https://github.com/Alamion/opencode-dsh-web/issues"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "opencode-web-secondary",
+          "title": "OpenCode",
+          "icon": "$(chat-sparkle)"
+        },
+        {
+          "id": "dsh-secondary",
+          "title": "DSH",
+          "icon": "$(rocket)"
+        }
+      ]
+    },
+    "views": {
+      "opencode-web-secondary": [
+        {
+          "type": "webview",
+          "id": "opencodeWeb.sidePanel",
+          "name": "OpenCode"
+        }
+      ],
+      "dsh-secondary": [
+        {
+          "type": "webview",
+          "id": "dshWeb.sidePanel",
+          "name": "DSH"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "opencodeWeb.open",
+        "title": "OpenCode Web: Open Sidebar",
+        "icon": "$(chat-sparkle)"
+      },
+      {
+        "command": "opencodeWeb.newSession",
+        "title": "OpenCode Web: New Session",
+        "icon": "$(add)"
+      },
+      {
+        "command": "opencodeWeb.openBrowser",
+        "title": "OpenCode Web: Open in System Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "opencodeWeb.reload",
+        "title": "OpenCode Web: Reload",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dshWeb.open",
+        "title": "DSH Web: Open Sidebar",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "dshWeb.reload",
+        "title": "DSH Web: Reload",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dshWeb.openBrowser",
+        "title": "DSH Web: Open in System Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "dshWeb.coderStart",
+        "title": "DSH Web: Start Coder Workspace",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "dshWeb.coderSelectApp",
+        "title": "DSH Web: Select Coder App",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "dshWeb.coderLogin",
+        "title": "DSH Web: Coder Login",
+        "icon": "$(sign-in)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "opencodeWeb.open",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "opencodeWeb.newSession",
+          "when": "view == opencodeWeb.sidePanel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "opencodeWeb.reload",
+          "when": "view == opencodeWeb.sidePanel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "opencodeWeb.openBrowser",
+          "when": "view == opencodeWeb.sidePanel",
+          "group": "navigation@3"
+        },
+        {
+          "command": "dshWeb.reload",
+          "when": "view == dshWeb.sidePanel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dshWeb.coderStart",
+          "when": "view == dshWeb.sidePanel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dshWeb.coderSelectApp",
+          "when": "view == dshWeb.sidePanel",
+          "group": "navigation@3"
+        },
+        {
+          "command": "dshWeb.openBrowser",
+          "when": "view == dshWeb.sidePanel",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "opencodeWeb.open",
+        "key": "alt+o"
+      },
+      {
+        "command": "dshWeb.open",
+        "key": "alt+d"
+      }
+    ],
+    "configuration": {
+      "title": "OpenCode & DSH Web",
+      "properties": {
+        "opencodeWeb.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:4096",
+          "description": "URL of the OpenCode server (opencode serve / service)."
+        },
+        "opencodeWeb.password": {
+          "type": "string",
+          "default": "",
+          "description": "OpenCode server password. If empty, it is read from ~/.config/opencode/service.json."
+        },
+        "opencodeWeb.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start 'opencode service start' automatically when the server is unreachable."
+        },
+        "opencodeWeb.deepLink": {
+          "type": "string",
+          "enum": [
+            "always",
+            "first",
+            "never"
+          ],
+          "default": "always",
+          "description": "Jump to the last chat of the current workspace folder: always, only on the first open per workspace, or never."
+        },
+        "dshWeb.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "coder",
+            "local"
+          ],
+          "default": "auto",
+          "description": "Where the DSH panel opens: 'auto' uses Coder when a deployment and session are found, otherwise the local DSH server; 'coder' or 'local' force one."
+        },
+        "dshWeb.url": {
+          "type": "string",
+          "default": "http://127.0.0.1:3080",
+          "description": "URL of a local DSH web GUI (dsh-host-webserver), used in 'local' mode."
+        },
+        "dshWeb.profile": {
+          "type": "string",
+          "default": "web",
+          "description": "DSH profile to boot when the local web GUI is unreachable and autoStart is on (for example 'web')."
+        },
+        "dshWeb.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start 'dsh --profile <profile> --no-open' automatically when the local web GUI is unreachable."
+        },
+        "dshWeb.coder.url": {
+          "type": "string",
+          "default": "",
+          "description": "Coder deployment URL. Empty: read from ~/.config/coderv2/url (the Coder CLI or VS Code extension)."
+        },
+        "dshWeb.coder.sessionPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Coder session-token file. Empty: use the freshest session under ~/.config/coderv2 or the coder-remote global storage."
+        },
+        "dshWeb.coder.token": {
+          "type": "string",
+          "default": "",
+          "description": "Coder session token to use directly, overriding sessionPath. Prefer logging in: the token expires."
+        },
+        "dshWeb.coder.appSlug": {
+          "type": "string",
+          "default": "",
+          "description": "Coder app slug to open. Empty: auto-detect from the running workspace's apps (use 'DSH Web: Select Coder App' if it asks)."
+        },
+        "dshWeb.coder.appDomain": {
+          "type": "string",
+          "default": "",
+          "description": "Domain workspace apps live on. Empty: the Coder deployment host."
+        },
+        "dshWeb.coder.workspace": {
+          "type": "string",
+          "default": "",
+          "description": "Coder workspace name. Empty: auto-detect ($CODER_WORKSPACE_NAME, the only owned workspace, the only running one, or the most recently used)."
+        },
+        "dshWeb.coder.owner": {
+          "type": "string",
+          "default": "",
+          "description": "Coder username that owns the workspace. Empty: the logged-in user."
+        },
+        "dshWeb.coder.agent": {
+          "type": "string",
+          "default": "",
+          "description": "Coder agent name to include in the app URL. Empty: omit it (slug--workspace--owner)."
+        },
+        "dshWeb.coder.autoStartWorkspace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start the Coder workspace automatically when it is stopped (otherwise the panel shows a Start button)."
+        },
+        "dshWeb.coder.cli": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the coder CLI used by 'DSH Web: Coder Login'. Empty: auto-detect in the coder-remote global storage, then PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "npm run build && vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.2",
+    "http-proxy": "^1.18.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
