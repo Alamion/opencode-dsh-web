@@ -59,18 +59,53 @@ function spawnProxyChild(script: string, env: NodeJS.ProcessEnv, label: string):
   });
 }
 
-export function startOpenCodeProxyChild(serverUrl: string, password: string, port: number): Promise<ProxyChild> {
+export function startOpenCodeProxyChild(
+  serverUrl: string,
+  password: string,
+  port: number,
+  appearanceFile = '',
+  syncPreferences = false,
+): Promise<ProxyChild> {
   return spawnProxyChild(
     'opencode-proxy.js',
-    { OC_TARGET: serverUrl, OC_PASSWORD: password || '', OC_PORT: String(port || 0) },
+    {
+      OC_TARGET: serverUrl,
+      OC_PASSWORD: password || '',
+      OC_PORT: String(port || 0),
+      OC_APPEARANCE_FILE: appearanceFile,
+      OC_SYNC_PREFERENCES: syncPreferences ? '1' : '0',
+    },
     'opencode-proxy',
   );
 }
 
-export function startCoderProxyChild(target: string, token: string, appHost: string, port: number): Promise<ProxyChild> {
+export interface CoderProxyOptions {
+  /** Local DSH launch URL (`dsh web: <url>`). */
+  launchUrl?: string;
+  /** File where the proxy remembers the DSH auth cookie between runs. */
+  cookieFile?: string;
+  /** DSH session id to select when the app boots (advanced deep link). */
+  sessionId?: string;
+}
+
+export function startCoderProxyChild(
+  target: string,
+  token: string,
+  appHost: string,
+  port: number,
+  options: CoderProxyOptions = {},
+): Promise<ProxyChild> {
   return spawnProxyChild(
     'coder-proxy.js',
-    { CODER_TARGET: target, CODER_TOKEN: token || '', CODER_APP_HOST: appHost || '', CODER_PORT: String(port || 0) },
+    {
+      CODER_TARGET: target,
+      CODER_TOKEN: token || '',
+      CODER_APP_HOST: appHost || '',
+      CODER_PORT: String(port || 0),
+      DSH_LAUNCH_URL: options.launchUrl || '',
+      DSH_COOKIE_FILE: options.cookieFile || '',
+      DSH_SESSION_ID: options.sessionId || '',
+    },
     'coder-proxy',
   );
 }

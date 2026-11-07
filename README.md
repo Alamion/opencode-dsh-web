@@ -1,29 +1,37 @@
 # OpenCode & DSH Web (Sidebar)
 
-![OpenCode & DSH Web — two web UIs in the VS Code sidebar](media/banner.png)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Alamion.opencode-dsh-web?style=flat-square&label=marketplace&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/Alamion.opencode-dsh-web?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/Alamion.opencode-dsh-web?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
+[![GitHub stars](https://img.shields.io/github/stars/Alamion/opencode-dsh-web?style=flat-square&logo=github)](https://github.com/Alamion/opencode-dsh-web)
+[![CI](https://github.com/Alamion/opencode-dsh-web/actions/workflows/ci.yml/badge.svg)](https://github.com/Alamion/opencode-dsh-web/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![VS Code](https://img.shields.io/badge/VS%20Code-1.90%2B-007ACC?style=flat-square&logo=visualstudiocode)](https://code.visualstudio.com)
 
 Open the [OpenCode](https://opencode.ai) web UI and the DeepSeek Harness (DSH)
 web UI in the VS Code **secondary sidebar** (the right column, next to the
-Claude Code / Codex panels) — pre-authenticated, at your project and last chat,
-locally or as a Coder workspace app.
+Claude Code / Codex panels) — pre-authenticated, at your project and last chat.
 
 Two webview panels:
 
 - **OpenCode** — the official OpenCode web UI, reached through a local
   authenticating proxy, deep-linked to the last chat of the current folder.
+  It connects to a local OpenCode server.
 - **DSH** — the DeepSeek Harness web UI (`dsh --profile web`), either the local
   server or a Coder workspace app such as DUST, with automatic sign-in.
 
 ## Screenshots
 
-<!-- Uncomment once real screenshots are committed under docs/screenshots/.
 ![OpenCode panel in the VS Code sidebar](docs/screenshots/opencode.png)
-![DSH as a Coder workspace app](docs/screenshots/dsh-coder.png)
-![DSH workspace stopped state](docs/screenshots/dsh-stopped.png)
--->
 
-Screenshots live in [`docs/screenshots`](docs/screenshots). See that folder for
-the shot list.
+![OpenCode Appearance settings](docs/screenshots/opencode-settings.png)
+
+![DSH as a Coder workspace app](docs/screenshots/dsh-coder.png)
+
+![DSH workspace stopped state](docs/screenshots/dsh-stopped.png)
+
+More details and the capture notes are in
+[`docs/screenshots`](docs/screenshots).
 
 ## Requirements
 
@@ -52,6 +60,24 @@ code --install-extension opencode-dsh-web-0.1.0.vsix
 Both panels also expose buttons in the view title bar and an
 `OpenCode Web: Open Sidebar` button in the editor title bar.
 
+External links can open a panel too:
+`vscode://Alamion.opencode-dsh-web/open-opencode` and
+`vscode://Alamion.opencode-dsh-web/open-dsh` (VS Code asks for confirmation the
+first time).
+
+## First run
+
+- **OpenCode** — if the server is unreachable or the password is missing, the
+  panel shows a **Connect to OpenCode** form with the server URL and password,
+  plus **Open Settings** and **Save & Connect** buttons. For a local server,
+  leave the password empty when `~/.config/opencode/service.json` exists; the
+  extension reads it. `opencode service start` creates that file if needed.
+- **DSH local** — the first open starts `dsh --profile <profile>` and remembers
+  the `dsh web: <url>` launch URL. If authentication fails, paste a fresh launch
+  URL in the panel or run **DSH Web: Set Launch URL**.
+- **DSH Coder** — when no Coder session is found, the panel offers **Coder
+  Login**. When a workspace exposes several apps, it offers **Select app**.
+
 ## OpenCode
 
 The extension starts a small local proxy that talks to your OpenCode server and
@@ -64,6 +90,14 @@ isolated webview origin — and with it the OpenCode UI state (the selected
 project and the open chats). Whenever the panel is opened (including after a
 window reload) it deep-links to the **last chat you opened** in the current
 folder, rather than the all-sessions list.
+
+`opencodeWeb.syncAppearance` shares the web UI theme, color scheme, fonts and
+other Appearance settings between windows through the proxy. Theme changes are
+pushed live; font and layout changes reload an unfocused panel. Set
+`opencodeWeb.syncPreferences` to also share general preferences, keybindings,
+notifications, sounds, language and motion tuning. Project permissions and
+workspace lists stay local. **OpenCode Web: Reset Shared Appearance** clears
+the shared profile and the synced state of every open panel.
 
 ## DSH
 
@@ -113,6 +147,12 @@ The panel:
 
 If the Coder session expires, the panel offers **DSH Web: Coder Login**.
 
+DSH stores theme and font size in the Host user-settings document
+(`ui-theme` namespace), so a local loopback panel already shares them across
+projects. DSH does not create that host-backed settings scope for non-loopback
+pages, so appearance changes in a Coder workspace app may not persist across
+reloads; that limitation is inside DSH rather than this extension.
+
 ## Settings
 
 ### OpenCode
@@ -123,6 +163,9 @@ If the Coder session expires, the panel offers **DSH Web: Coder Login**.
 | `opencodeWeb.password` | *(from service.json)* | Server password. |
 | `opencodeWeb.autoStart` | `true` | Run `opencode service start` when the server is unreachable. |
 | `opencodeWeb.deepLink` | `always` | Open the last chat: `always`, `first`, or `never`. |
+| `opencodeWeb.syncAppearance` | `true` | Share the OpenCode web UI theme and Appearance settings across windows. |
+| `opencodeWeb.syncPreferences` | `false` | Also share general preferences, keybindings, notifications, sounds, language and motion tuning. |
+| `opencodeWeb.openOnStartup` | `false` | Focus the OpenCode panel when a window starts. |
 
 ### DSH
 
@@ -132,6 +175,7 @@ If the Coder session expires, the panel offers **DSH Web: Coder Login**.
 | `dshWeb.url` | `http://127.0.0.1:3080` | Local DSH web GUI (in `local` mode). |
 | `dshWeb.profile` | `web` | Profile to boot for a local DSH. |
 | `dshWeb.autoStart` | `true` | Boot the local DSH when it is unreachable. |
+| `dshWeb.openOnStartup` | `false` | Focus the DSH panel when a window starts. |
 | `dshWeb.coder.url` | *(from `~/.config/coderv2/url`)* | Coder deployment URL. |
 | `dshWeb.coder.sessionPath` | *(auto)* | Path to the Coder session-token file. |
 | `dshWeb.coder.token` | `""` | Session token used directly (overrides `sessionPath`). |
@@ -149,12 +193,14 @@ If the Coder session expires, the panel offers **DSH Web: Coder Login**.
 - **OpenCode Web: New Session**
 - **OpenCode Web: Open in System Browser**
 - **OpenCode Web: Reload**
+- **OpenCode Web: Reset Shared Appearance**
 - **DSH Web: Open Sidebar** (`Alt+D`)
 - **DSH Web: Reload**
 - **DSH Web: Open in System Browser**
 - **DSH Web: Start Coder Workspace**
 - **DSH Web: Select Coder App**
 - **DSH Web: Coder Login**
+- **DSH Web: Set Launch URL**
 
 ## How it works
 
@@ -165,6 +211,9 @@ is fronted by a local `127.0.0.1` proxy child process (started with
 the loopback target:
 
 - The OpenCode proxy injects `Authorization: Basic opencode:<password>`.
+- When appearance sync is on, the OpenCode proxy also injects a small profile
+  script into `index.html`, captures `localStorage` changes and streams updates
+  to other panels over SSE.
 - The Coder proxy injects `Coder-Session-Token`, forces `Host`/`Origin` to the
   app host, and performs DSH's launch-token exchange itself.
 
@@ -178,6 +227,9 @@ reloads.
   gains the injected credentials, so do not expose it.
 - The Coder session token is read from disk (or settings) and never leaves your
   machine except to your own deployment.
+- The shared appearance profile is a `0600` file in the extension global
+  storage. Its write endpoint requires a custom header, so a random web page
+  cannot overwrite it through localhost.
 - Nothing is telemetry-tracked by this extension.
 
 ## Troubleshooting
@@ -191,6 +243,19 @@ reloads.
   `dshWeb.coder.autoStartWorkspace`.
 - **OpenCode panel shows the sessions list** — set `opencodeWeb.deepLink` to
   `always` (the default) so it re-opens the last chat.
+- **The theme does not appear in an existing panel right after an extension
+  update** — reload the panel once; an old Workbox service worker may still be
+  serving the cached `index.html`.
+- **Shared appearance is wrong** — run **OpenCode Web: Reset Shared Appearance**
+  and pick the theme again in one window.
+- **OpenCode panel shows "Connect to OpenCode"** — enter the server URL and
+  password, or fix `opencodeWeb.serverUrl` / `opencodeWeb.password` and click
+  **Save & Connect**.
+- **DSH local reports "Failed to load plugins"** — this comes from the local
+  DSH profile, not the panel. Reinstall or upgrade that profile; Coder-hosted
+  DSH works independently.
+- **DSH local says authentication required** — run **DSH Web: Set Launch URL**
+  and paste a fresh `dsh web: <url>` line.
 
 ## Development
 

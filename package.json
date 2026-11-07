@@ -95,6 +95,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "opencodeWeb.resetAppearance",
+        "title": "OpenCode Web: Reset Shared Appearance",
+        "icon": "$(discard)"
+      },
+      {
         "command": "dshWeb.open",
         "title": "DSH Web: Open Sidebar",
         "icon": "$(rocket)"
@@ -123,6 +128,11 @@
         "command": "dshWeb.coderLogin",
         "title": "DSH Web: Coder Login",
         "icon": "$(sign-in)"
+      },
+      {
+        "command": "dshWeb.setToken",
+        "title": "DSH Web: Set Launch URL",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -147,6 +157,11 @@
           "command": "opencodeWeb.openBrowser",
           "when": "view == opencodeWeb.sidePanel",
           "group": "navigation@3"
+        },
+        {
+          "command": "opencodeWeb.resetAppearance",
+          "when": "view == opencodeWeb.sidePanel",
+          "group": "navigation@4"
         },
         {
           "command": "dshWeb.reload",
@@ -207,6 +222,31 @@
           ],
           "default": "always",
           "description": "Jump to the last chat of the current workspace folder: always, only on the first open per workspace, or never."
+        },
+        "opencodeWeb.syncAppearance": {
+          "type": "boolean",
+          "default": true,
+          "description": "Share the OpenCode web UI appearance (theme, color scheme, fonts) across VS Code windows and workspaces."
+        },
+        "opencodeWeb.syncPreferences": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also share general preferences, keybindings, notifications, sounds, language and motion tuning. Project permissions and workspace lists stay local."
+        },
+        "opencodeWeb.openOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Focus the OpenCode panel automatically when a VS Code window starts."
+        },
+        "dshWeb.openOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Focus the DSH panel automatically when a VS Code window starts."
+        },
+        "dshWeb.sessionId": {
+          "type": "string",
+          "default": "",
+          "description": "Advanced: open this DSH session when the panel loads."
         },
         "dshWeb.mode": {
           "type": "string",
@@ -292,7 +332,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package": "npm run build && vsce package --no-dependencies",
+    "package": "npm run build && vsce package --no-dependencies --no-rewrite-relative-links",
     "vscode:prepublish": "npm run build"
   },
   "devDependencies": {

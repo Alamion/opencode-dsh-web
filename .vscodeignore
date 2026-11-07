@@ -7,7 +7,6 @@ tests/**
 scripts/**
 node_modules/**
 coverage/
-docs/**
 tsconfig.json
 vitest.config.ts
 package-lock.json

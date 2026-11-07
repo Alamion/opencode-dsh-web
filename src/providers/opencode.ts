@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { opencodeFrame } from '../core/html';
+import { opencodeFrame, opencodeSetup } from '../core/html';
 import { basicAuth, OpenCodeSession, parseCreatedSessionId, pickLatestSession, sessionDeepLink } from '../core/opencode';
 import { opencodeConfig } from './settings';
 
@@ -7,24 +7,53 @@ export const OPENCODE_VIEW = 'opencodeWeb.sidePanel';
 
 type DeepLinkMode = 'always' | 'first' | 'never';
 
+interface WebviewMessage {
+  type?: string;
+  serverUrl?: string;
+  password?: string;
+}
+
 /** The OpenCode web UI, pre-authenticated through the local proxy. */
 export class OpenCodeProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
+  private setupError = '';
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly proxyUrl: string,
-    private readonly serverUrl: string,
-    private readonly password: string,
+    private proxyUrl: string,
+    private serverUrl: string,
+    private password: string,
+    private readonly connect: (settings?: { serverUrl?: string; password?: string }) => Promise<boolean>,
   ) {}
 
   get isOpen(): boolean {
     return this.view !== undefined;
   }
 
+  setConnection(proxyUrl: string, serverUrl: string, password: string, error = ''): void {
+    this.proxyUrl = proxyUrl;
+    this.serverUrl = serverUrl;
+    this.password = password;
+    this.setupError = error;
+  }
+
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     view.webview.options = { enableScripts: true };
+    view.webview.onDidReceiveMessage((message: WebviewMessage) => {
+      if (message.type === 'connect') {
+        void this.connect({
+          serverUrl: message.serverUrl ?? '',
+          password: message.password ?? '',
+        }).then((ok) => {
+          if (ok) this.setupError = '';
+          else if (!this.setupError) this.setupError = 'Could not reach the OpenCode server.';
+          return this.render();
+        });
+      } else if (message.type === 'openSettings') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'opencodeWeb');
+      }
+    });
     void this.render();
   }
 
@@ -34,6 +63,9 @@ export class OpenCodeProvider implements vscode.WebviewViewProvider {
   }
 
   async html(): Promise<string> {
+    if (!this.proxyUrl) {
+      return opencodeSetup(this.serverUrl, this.password !== '', this.setupError);
+    }
     const config = opencodeConfig();
     const deepLink = config.get<DeepLinkMode>('deepLink', 'always');
     let target = this.proxyUrl + '/';
@@ -82,10 +114,14 @@ export class OpenCodeProvider implements vscode.WebviewViewProvider {
         headers: { Authorization: basicAuth(this.password) },
         signal: AbortSignal.timeout(4000),
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.warn('[opencode] session list failed with HTTP ' + response.status);
+        return null;
+      }
       const body = (await response.json()) as { data?: OpenCodeSession[] };
       return pickLatestSession(body.data ?? []);
-    } catch {
+    } catch (error) {
+      console.warn('[opencode] session list failed:', (error as Error).message);
       return null;
     }
   }

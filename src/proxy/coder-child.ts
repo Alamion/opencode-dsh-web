@@ -11,8 +11,10 @@
 //            and refuses the cookie, one exchange is retried.
 // Host and Origin are forced to the app host (DSH binds its cookie to it and
 // Coder routes subdomain apps by Host).
+import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as net from 'node:net';
+import * as path from 'node:path';
 import * as zlib from 'node:zlib';
 import { buildCookieHeader, captureCookies, createCookieState, isHopByHop } from '../core/cookies';
 import { parseLaunchToken } from '../core/coder';
@@ -21,6 +23,9 @@ const target = process.env.CODER_TARGET;
 const token = process.env.CODER_TOKEN || '';
 const appHost = process.env.CODER_APP_HOST || '';
 const preferredPort = parseInt(process.env.CODER_PORT || '0', 10) || 0;
+const launchUrl = process.env.DSH_LAUNCH_URL || '';
+const cookieFile = process.env.DSH_COOKIE_FILE || '';
+const sessionId = process.env.DSH_SESSION_ID || '';
 
 if (!target) {
   process.stderr.write('CODER_TARGET is not set\n');
@@ -34,6 +39,28 @@ const hostHeader = appHost || parsed.host;
 
 const state = createCookieState();
 let exchanging: Promise<boolean> | null = null;
+
+function readCookieFile(): void {
+  if (!cookieFile) return;
+  try {
+    const value = fs.readFileSync(cookieFile, 'utf8').trim();
+    if (value.startsWith('dsh-auth-')) state.dsh = value;
+  } catch {
+    // no saved cookie yet
+  }
+}
+
+function saveCookieFile(): void {
+  if (!cookieFile || !state.dsh) return;
+  try {
+    fs.mkdirSync(path.dirname(cookieFile), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(cookieFile, state.dsh, { mode: 0o600 });
+  } catch {
+    // the cookie still works for this proxy lifetime
+  }
+}
+
+readCookieFile();
 
 function outHeaders(incoming: http.IncomingHttpHeaders, withCookie: boolean): http.OutgoingHttpHeaders {
   const headers: http.OutgoingHttpHeaders = {};
@@ -94,15 +121,30 @@ function decodeBody(body: Buffer, encoding: string): Buffer {
 }
 
 /** Read the launch page (no dsh cookie) and exchange its token for the cookie. */
-function exchange(): Promise<boolean> {
+function exchange(force = false): Promise<boolean> {
+  if (state.dsh && !force) return Promise.resolve(true);
   if (exchanging) return exchanging;
+  if (force) state.dsh = '';
   exchanging = (async () => {
+    if (launchUrl) {
+      const launch = new URL(launchUrl);
+      const response = await upRequest(
+        'GET',
+        launch.pathname + launch.search,
+        outHeaders({ host: hostHeader, accept: '*/*' }, false),
+      );
+      response.resume();
+      await new Promise<void>((resolve) => response.on('end', () => resolve()));
+      saveCookieFile();
+      return Boolean(state.dsh);
+    }
     const probe = await upRequest('GET', '/', outHeaders({ host: hostHeader, accept: 'text/html' }, false));
     const launchToken = parseLaunchToken((await readAll(probe)).toString('utf8'));
     if (!launchToken) return false;
     const response = await upRequest('GET', '/?token=' + encodeURIComponent(launchToken), outHeaders({ host: hostHeader, accept: '*/*' }, false));
     response.resume();
     await new Promise<void>((resolve) => response.on('end', () => resolve()));
+    saveCookieFile();
     return Boolean(state.dsh);
   })()
     .catch(() => false)
@@ -113,6 +155,13 @@ function exchange(): Promise<boolean> {
 }
 
 async function sendUpstream(req: http.IncomingMessage, res: http.ServerResponse, body: Buffer, retried: boolean): Promise<void> {
+  if (!state.dsh && launchUrl) {
+    try {
+      await exchange();
+    } catch {
+      // fall through; the auth page will explain the failure
+    }
+  }
   let upstream: http.IncomingMessage;
   try {
     upstream = await upRequest(req.method ?? 'GET', req.url ?? '/', outHeaders(req.headers, true), body);
@@ -125,7 +174,7 @@ async function sendUpstream(req: http.IncomingMessage, res: http.ServerResponse,
   if (upstream.statusCode === 401 && !retried) {
     upstream.resume();
     await new Promise<void>((resolve) => upstream.on('end', () => resolve()));
-    if (await exchange()) {
+    if (await exchange(true)) {
       await sendUpstream(req, res, body, true);
       return;
     }
@@ -148,7 +197,13 @@ async function sendUpstream(req: http.IncomingMessage, res: http.ServerResponse,
       res.end('DSH launch token could not be exchanged; see the Coder proxy log.');
       return;
     }
-    const out = Buffer.from(html, 'utf8');
+    let injected = html;
+    if (sessionId) {
+      const value = JSON.stringify(sessionId).replace(/</g, '\\u003c');
+      const script = `<script>try{localStorage.setItem("dsh.sessions.current",JSON.stringify({sessionId:${value}}))}catch(e){}</script>`;
+      injected = injected.replace(/<\/head>/i, script + '</head>');
+    }
+    const out = Buffer.from(injected, 'utf8');
     const headers: http.OutgoingHttpHeaders = {};
     for (const [key, value] of Object.entries(upstream.headers)) {
       if (!isHopByHop(key)) headers[key] = value;
@@ -170,6 +225,11 @@ async function sendUpstream(req: http.IncomingMessage, res: http.ServerResponse,
 }
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/__dsh/status') {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ auth: Boolean(state.dsh) }));
+    return;
+  }
   const chunks: Buffer[] = [];
   req.on('data', (chunk: Buffer) => chunks.push(chunk));
   req.on('end', () => {
@@ -226,6 +286,7 @@ function report(): void {
 }
 
 server.listen(preferredPort, '127.0.0.1', report);
+if (launchUrl) void exchange();
 
 process.stdin.on('end', () => process.exit(0));
 process.on('SIGTERM', () => process.exit(0));

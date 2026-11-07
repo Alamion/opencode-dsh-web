@@ -1,4 +1,6 @@
 import * as cp from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { CoderTarget, isAppReady, listCoderApps, resolveTarget, startWorkspace } from '../core/coder';
 import { dshFrame, dshMessage, dshTokenPrompt } from '../core/html';
@@ -87,6 +89,8 @@ async function ensureDshLocal(url: string, profile: string, context: vscode.Exte
 export class DshProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private coderProxy?: CoderProxy;
+  private localProxy?: ProxyChild;
+  private localProxyKey = '';
   private busy = false;
   private autoStarted = false;
 
@@ -107,6 +111,22 @@ export class DshProvider implements vscode.WebviewViewProvider {
   dispose(): void {
     this.coderProxy?.dispose();
     this.coderProxy = undefined;
+    this.disposeLocalProxy();
+  }
+
+  private disposeLocalProxy(): void {
+    this.localProxy?.dispose();
+    this.localProxy = undefined;
+    this.localProxyKey = '';
+  }
+
+  /** Store a fresh `dsh web: <url>` launch URL and reload the panel. */
+  async setLaunchToken(value: string): Promise<void> {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    await this.context.globalState.update('dshWeb.tokenUrl.' + this.localProfile(), trimmed);
+    this.disposeLocalProxy();
+    await this.render();
   }
 
   async html(): Promise<string> {
@@ -179,8 +199,7 @@ export class DshProvider implements vscode.WebviewViewProvider {
   private async onMessage(message: WebviewMessage): Promise<void> {
     if (!message || !message.type) return;
     if (message.type === 'setToken' && message.url) {
-      await this.context.globalState.update('dshWeb.tokenUrl.' + this.localProfile(), message.url);
-      await this.render();
+      await this.setLaunchToken(message.url);
     } else if (message.type === 'coderStart') {
       this.autoStarted = true;
       await this.startCoder();
@@ -219,7 +238,9 @@ export class DshProvider implements vscode.WebviewViewProvider {
     });
     if (port) await this.context.globalState.update(stateKey, port);
 
-    const child = await startCoderProxyChild(target.appUrl, target.deployment.token, target.appHost, port);
+    const child = await startCoderProxyChild(target.appUrl, target.deployment.token, target.appHost, port, {
+      sessionId: dshConfig().get<string>('sessionId', ''),
+    });
     const proxy = Object.assign(child, { key }) as CoderProxy;
     this.coderProxy = proxy;
     return proxy;
@@ -339,7 +360,64 @@ export class DshProvider implements vscode.WebviewViewProvider {
         [{ act: 'retry', label: 'Retry' }],
       );
     }
-    if (status === 401 && !tokenUrl) return dshTokenPrompt(url);
-    return dshFrame(status === 401 && tokenUrl ? tokenUrl : url + '/');
+    // A VS Code webview is a third-party context for 127.0.0.1, so DSH's
+    // SameSite=Strict cookie cannot be used directly in the iframe. The local
+    // proxy owns the cookie and injects it server-side, exactly like the Coder
+    // proxy does for workspace apps.
+    let proxy: ProxyChild;
+    try {
+      proxy = await this.ensureLocalProxy(url, tokenUrl ?? '', profile);
+    } catch (error) {
+      return dshMessage('Could not start the DSH proxy', (error as Error).message, [{ act: 'retry', label: 'Retry' }]);
+    }
+    if (!(await this.waitForDshAuth(proxy.url))) return dshTokenPrompt(url);
+    return dshFrame(proxy.url + '/');
+  }
+
+  private async ensureLocalProxy(url: string, tokenUrl: string, profile: string): Promise<ProxyChild> {
+    const key = [url, tokenUrl, profile].join('|');
+    if (this.localProxy && this.localProxyKey === key) return this.localProxy;
+    this.disposeLocalProxy();
+
+    const stateKey = 'dshWeb.localPort.' + profile;
+    const port = await choosePort({
+      saved: this.context.globalState.get<number>(stateKey, 0),
+      seed: 'dsh-local|' + profile + '|' + url,
+      base: 39000,
+      span: 1000,
+      cap: 40000,
+    });
+    if (port) await this.context.globalState.update(stateKey, port);
+
+    fs.mkdirSync(this.context.globalStorageUri.fsPath, { recursive: true });
+    const cookieFile = path.join(
+      this.context.globalStorageUri.fsPath,
+      'dsh-local-cookie-' + encodeURIComponent(profile) + '.txt',
+    );
+    const proxy = await startCoderProxyChild(url, '', new URL(url).host, port, {
+      launchUrl: tokenUrl,
+      cookieFile,
+      sessionId: dshConfig().get<string>('sessionId', ''),
+    });
+    this.localProxy = proxy;
+    this.localProxyKey = key;
+    return proxy;
+  }
+
+  private async waitForDshAuth(proxyUrl: string): Promise<boolean> {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try {
+        const response = await fetch(proxyUrl + '/__dsh/status', { signal: AbortSignal.timeout(1500) });
+        if (response.ok) {
+          const body = (await response.json()) as { auth?: boolean };
+          if (body.auth) return true;
+          if (attempt >= 3) return false;
+        }
+      } catch {
+        // proxy still starting
+      }
+      await sleep(400);
+    }
+    return false;
   }
 }

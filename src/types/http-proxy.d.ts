@@ -4,6 +4,7 @@ declare module 'http-proxy' {
     ws?: boolean;
     changeOrigin?: boolean;
     xfwd?: boolean;
+    selfHandleResponse?: boolean;
   }
 
   export interface ProxyServer {

@@ -21,6 +21,14 @@ const DSH_PAGE_CSS = `
 
 const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;";
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /** A centred message with action buttons wired to the webview message channel. */
 export function dshMessage(title: string, detail: string, actions: readonly DshAction[] = []): string {
   const buttons = actions.map((a) => `<button data-act="${a.act}">${a.label}</button>`).join('');
@@ -88,6 +96,54 @@ export function dshTokenPrompt(url: string): string {
   document.querySelector('button[data-act=open]').addEventListener('click', () => {
     const v = document.getElementById('tok').value.trim();
     if (v) vs.postMessage({ type: 'setToken', url: v });
+  });
+</script>
+</body>
+</html>`;
+}
+
+/** First-run setup when no proxy can reach the OpenCode server. */
+export function opencodeSetup(serverUrl: string, hasPassword: boolean, error = ''): string {
+  const errorBlock = error ? `<div class="err">${escapeHtml(error)}</div>` : '';
+  return `<!DOCTYPE html>
+<html style="height:100%">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="${CSP}">
+<style>${DSH_PAGE_CSS}
+  #setup{max-width:420px;width:88%;margin:0 auto}
+  #setup h2{margin:0 0 8px;font-size:16px;color:#eee}
+  #setup p{margin:0 0 16px;line-height:1.4}
+  #setup label{display:block;margin:12px 0 4px;font-size:12px;color:#bbb}
+  #setup input{display:block;width:100%;box-sizing:border-box}
+  #setup .actions{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div id="fallback">
+  <div id="setup">
+    <h2>Connect to OpenCode</h2>
+    <p>Enter the OpenCode server URL and password. For a local server, the password is read from <code>~/.config/opencode/service.json</code> when the field is empty.</p>
+    ${errorBlock}
+    <label for="url">Server URL</label>
+    <input id="url" value="${escapeHtml(serverUrl)}" spellcheck="false" />
+    <label for="password">Password</label>
+    <input id="password" type="password" placeholder="${hasPassword ? 'saved — leave empty to keep it' : 'service.json or opencodeWeb.password'}" />
+    <div class="actions">
+      <button data-act="connect">Save &amp; Connect</button>
+      <button data-act="openSettings">Open Settings</button>
+    </div>
+  </div>
+</div>
+<script>
+  const vs = acquireVsCodeApi();
+  document.querySelector('button[data-act=connect]').addEventListener('click', () => {
+    const url = document.getElementById('url').value.trim();
+    const password = document.getElementById('password').value;
+    vs.postMessage({ type: 'connect', serverUrl: url, password });
+  });
+  document.querySelector('button[data-act=openSettings]').addEventListener('click', () => {
+    vs.postMessage({ type: 'openSettings' });
   });
 </script>
 </body>

@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `opencodeWeb.syncAppearance`: share the OpenCode web UI appearance
+  (theme, color scheme and Appearance settings) across VS Code windows by
+  injecting a shared profile into the proxy origin, with live theme updates
+  over SSE.
+- `opencodeWeb.syncPreferences`: optionally share general preferences,
+  keybindings, notifications, sounds, language and motion tuning.
+- **OpenCode Web: Reset Shared Appearance** command.
+- First-run **Connect to OpenCode** form (server URL and password) when the
+  local server is unreachable or the password is missing.
+- `opencodeWeb.openOnStartup` and `dshWeb.openOnStartup` settings.
+- URI handlers: `vscode://Alamion.opencode-dsh-web/open-opencode` and
+  `/open-dsh`.
+- **DSH Web: Set Launch URL** for refreshing a local DSH launch token.
+- Real Marketplace screenshots and regenerated banner/icon.
+
+### Fixed
+
+- Local DSH is proxied through the extension, so its `SameSite=Strict` auth
+  cookie works inside a VS Code webview.
+- The OpenCode password is re-read after `opencode service start` creates
+  `service.json`.
+
 ## [0.1.0] - 2026-11-06
 
 ### Added

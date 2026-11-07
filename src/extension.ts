@@ -1,16 +1,32 @@
 import * as cp from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { createResetProfile } from './core/appearance';
 import { choosePort } from './core/net';
+import { basicAuth } from './core/opencode';
 import { sleep, stripTrailingSlash } from './core/util';
 import { DSH_VIEW, DshProvider } from './providers/dsh';
 import { OPENCODE_VIEW, OpenCodeProvider } from './providers/opencode';
 import { ProxyChild, startOpenCodeProxyChild, startOpenCodeProxyInProcess } from './providers/proxy';
-import { coderCliPath, opencodeConfig, readCoderDeployment, readOpenCodePassword } from './providers/settings';
+import { coderCliPath, dshConfig, opencodeConfig, readCoderDeployment, readOpenCodePassword } from './providers/settings';
 
 async function pingServer(serverUrl: string): Promise<boolean> {
   try {
     const response = await fetch(serverUrl + '/api/info', { signal: AbortSignal.timeout(2000) });
     return response.status === 401 || response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function checkOpenCodeAuth(serverUrl: string, password: string): Promise<boolean> {
+  try {
+    const response = await fetch(serverUrl + '/api/info', {
+      headers: { Authorization: basicAuth(password) },
+      signal: AbortSignal.timeout(2500),
+    });
+    return response.status !== 401;
   } catch {
     return false;
   }
@@ -49,9 +65,15 @@ async function pickOpenCodePort(context: vscode.ExtensionContext, folder: vscode
   return port;
 }
 
-async function startOpenCodeProxy(serverUrl: string, password: string, port: number): Promise<ProxyChild> {
+async function startOpenCodeProxy(
+  serverUrl: string,
+  password: string,
+  port: number,
+  appearanceFile: string,
+  syncPreferences: boolean,
+): Promise<ProxyChild> {
   try {
-    return await startOpenCodeProxyChild(serverUrl, password, port);
+    return await startOpenCodeProxyChild(serverUrl, password, port, appearanceFile, syncPreferences);
   } catch (error) {
     console.warn('[opencode] child proxy failed, using in-process proxy:', (error as Error).message);
     return startOpenCodeProxyInProcess(serverUrl, password);
@@ -59,25 +81,83 @@ async function startOpenCodeProxy(serverUrl: string, password: string, port: num
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const serverUrl = stripTrailingSlash(opencodeConfig().get<string>('serverUrl', 'http://127.0.0.1:4096'));
-  const password = readOpenCodePassword();
+  const folder = (vscode.workspace.workspaceFolders ?? [])[0];
+  const appearanceFile = prepareAppearanceFile(context);
+  const syncPreferences = appearanceFile !== '' && opencodeConfig().get<boolean>('syncPreferences', false);
 
-  if (!(await ensureServer(serverUrl))) {
-    const choice = await vscode.window.showWarningMessage(
-      `OpenCode server at ${serverUrl} is unreachable. Start it with: opencode service start`,
-      'Retry',
-    );
-    if (choice === 'Retry') await activate(context);
-    return;
+  let serverUrl = stripTrailingSlash(opencodeConfig().get<string>('serverUrl', 'http://127.0.0.1:4096'));
+  let password = readOpenCodePassword();
+  let proxy: ProxyChild | undefined;
+  let proxyServerUrl = '';
+  let proxyPassword = '';
+  let openCode: OpenCodeProvider;
+
+  const connect = async (settings?: { serverUrl?: string; password?: string }): Promise<boolean> => {
+    if (settings?.serverUrl) {
+      await opencodeConfig().update('serverUrl', stripTrailingSlash(settings.serverUrl), vscode.ConfigurationTarget.Global);
+    }
+    if (settings?.password) {
+      await opencodeConfig().update('password', settings.password, vscode.ConfigurationTarget.Global);
+    }
+    serverUrl = stripTrailingSlash(opencodeConfig().get<string>('serverUrl', 'http://127.0.0.1:4096'));
+    if (!(await ensureServer(serverUrl))) {
+      password = readOpenCodePassword();
+      openCode.setConnection(
+        '',
+        serverUrl,
+        password,
+        `OpenCode server at ${serverUrl} is unreachable. Start it with "opencode service start", then retry.`,
+      );
+      return false;
+    }
+    // `opencode service start` may have just created service.json.
+    password = readOpenCodePassword();
+    if (!(await checkOpenCodeAuth(serverUrl, password))) {
+      openCode.setConnection(
+        '',
+        serverUrl,
+        password,
+        'The OpenCode server rejected the password. Check opencodeWeb.password or ~/.config/opencode/service.json.',
+      );
+      return false;
+    }
+    if (proxy && proxyServerUrl === serverUrl && proxyPassword === password) {
+      openCode.setConnection(proxy.url, serverUrl, password);
+      return true;
+    }
+    proxy?.dispose();
+    proxy = undefined;
+    const port = await pickOpenCodePort(context, folder);
+    proxy = await startOpenCodeProxy(serverUrl, password, port, appearanceFile, syncPreferences);
+    proxyServerUrl = serverUrl;
+    proxyPassword = password;
+    openCode.setConnection(proxy.url, serverUrl, password);
+    return true;
+  };
+
+  // First attempt. If it fails, the panel renders the setup form instead of
+  // leaving Alt+O with an unregistered view.
+  if (await ensureServer(serverUrl)) {
+    password = readOpenCodePassword();
+    if (await checkOpenCodeAuth(serverUrl, password)) {
+      const port = await pickOpenCodePort(context, folder);
+      proxy = await startOpenCodeProxy(serverUrl, password, port, appearanceFile, syncPreferences);
+      proxyServerUrl = serverUrl;
+      proxyPassword = password;
+    }
   }
 
-  const folder = (vscode.workspace.workspaceFolders ?? [])[0];
-  const port = await pickOpenCodePort(context, folder);
-  const proxy = await startOpenCodeProxy(serverUrl, password, port);
-  context.subscriptions.push({ dispose: () => proxy.dispose() });
-
-  const openCode = new OpenCodeProvider(context, proxy.url, serverUrl, password);
+  openCode = new OpenCodeProvider(context, proxy?.url ?? '', serverUrl, password, connect);
+  if (!proxy) {
+    openCode.setConnection(
+      '',
+      serverUrl,
+      password,
+      `OpenCode server at ${serverUrl} is unreachable, or the password is missing. Fill in the server URL and password below.`,
+    );
+  }
   const dsh = new DshProvider(context);
+  context.subscriptions.push({ dispose: () => proxy?.dispose() });
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(OPENCODE_VIEW, openCode, { webviewOptions: { retainContextWhenHidden: true } }),
@@ -85,11 +165,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     { dispose: () => dsh.dispose() },
 
     vscode.commands.registerCommand('opencodeWeb.open', () => vscode.commands.executeCommand(`${OPENCODE_VIEW}.focus`)),
-    vscode.commands.registerCommand('opencodeWeb.reload', () => openCode.render()),
-    vscode.commands.registerCommand('opencodeWeb.openBrowser', () => vscode.env.openExternal(vscode.Uri.parse(proxy.url + '/'))),
+    vscode.commands.registerCommand('opencodeWeb.reload', async () => {
+      if (!proxy) await connect();
+      await openCode.render();
+    }),
+    vscode.commands.registerCommand('opencodeWeb.openBrowser', () =>
+      vscode.env.openExternal(vscode.Uri.parse((proxy?.url ?? serverUrl) + '/')),
+    ),
     vscode.commands.registerCommand('opencodeWeb.newSession', async () => {
       if (!openCode.isOpen) await vscode.commands.executeCommand(`${OPENCODE_VIEW}.focus`);
+      if (!proxy && !(await connect())) return;
       await openCode.createSession();
+    }),
+    vscode.commands.registerCommand('opencodeWeb.resetAppearance', async () => {
+      if (!appearanceFile) {
+        vscode.window.showInformationMessage('OpenCode appearance sync is disabled (opencodeWeb.syncAppearance).');
+        return;
+      }
+      try {
+        writeResetProfile(appearanceFile);
+        await openCode.render();
+        vscode.window.showInformationMessage('Shared OpenCode appearance has been reset.');
+      } catch (error) {
+        vscode.window.showErrorMessage(`Could not reset OpenCode appearance: ${(error as Error).message}`);
+      }
     }),
 
     vscode.commands.registerCommand('dshWeb.open', () => vscode.commands.executeCommand(`${DSH_VIEW}.focus`)),
@@ -100,6 +199,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await dsh.render();
     }),
     vscode.commands.registerCommand('dshWeb.coderSelectApp', () => dsh.selectCoderApp()),
+    vscode.window.registerUriHandler({
+      handleUri(uri) {
+        if (uri.path === '/open-opencode') return vscode.commands.executeCommand(`${OPENCODE_VIEW}.focus`);
+        if (uri.path === '/open-dsh') return vscode.commands.executeCommand(`${DSH_VIEW}.focus`);
+        return undefined;
+      },
+    }),
+    vscode.commands.registerCommand('dshWeb.setToken', async () => {
+      const value = await vscode.window.showInputBox({
+        title: 'DSH launch URL',
+        prompt: 'Paste the line printed by dsh: dsh web: <url>',
+        ignoreFocusOut: true,
+      });
+      if (value) await dsh.setLaunchToken(value);
+    }),
     vscode.commands.registerCommand('dshWeb.coderLogin', () => {
       const deployment = readCoderDeployment();
       const cli = coderCliPath();
@@ -108,6 +222,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       terminal.sendText(deployment.url ? `"${cli}" login ${deployment.url}` : `"${cli}" login`);
     }),
   );
+
+  const openOpenCode = opencodeConfig().get<boolean>('openOnStartup', false);
+  const openDsh = dshConfig().get<boolean>('openOnStartup', false);
+  if (openOpenCode || openDsh) {
+    // Let the workspace folders settle before resolving the view: the panel
+    // deep-links to the last chat of the current folder.
+    setTimeout(() => {
+      void vscode.commands.executeCommand(`${openOpenCode ? OPENCODE_VIEW : DSH_VIEW}.focus`);
+    }, 2000);
+  }
+}
+
+function writeResetProfile(file: string): void {
+  const temporary = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(createResetProfile()), { mode: 0o600 });
+  fs.renameSync(temporary, file);
+}
+
+function prepareAppearanceFile(context: vscode.ExtensionContext): string {
+  if (!opencodeConfig().get<boolean>('syncAppearance', true)) return '';
+  try {
+    fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
+    return path.join(context.globalStorageUri.fsPath, 'appearance.json');
+  } catch (error) {
+    console.warn('[opencode] cannot prepare appearance storage:', (error as Error).message);
+    return '';
+  }
 }
 
 export function deactivate(): void {
