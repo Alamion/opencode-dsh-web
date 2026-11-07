@@ -9,6 +9,13 @@ export interface OpenCodeSession {
   };
 }
 
+/** Pick the OpenCode transport: explicit Coder, automatic Coder, or local. */
+export function chooseOpenCodeMode(mode: string, coderWorkspace: string): 'local' | 'coder' {
+  if (mode === 'coder') return 'coder';
+  if (mode === 'auto' && coderWorkspace.trim()) return 'coder';
+  return 'local';
+}
+
 /** OpenCode expects HTTP Basic with the literal user name `opencode`. */
 export function basicAuth(password: string): string {
   return 'Basic ' + Buffer.from('opencode:' + password).toString('base64');

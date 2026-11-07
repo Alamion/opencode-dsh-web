@@ -201,11 +201,12 @@
         "opencodeWeb.mode": {
           "type": "string",
           "enum": [
+            "auto",
             "local",
             "coder"
           ],
           "default": "local",
-          "description": "OpenCode source: 'local' uses opencodeWeb.serverUrl; 'coder' uses an OpenCode Coder app in a Coder workspace (connection settings come from dshWeb.coder.*)."
+          "description": "OpenCode source: 'local' uses opencodeWeb.serverUrl; 'coder' uses an OpenCode Coder app; 'auto' chooses Coder when dshWeb.coder.workspace is set, otherwise local. Coder connection settings come from dshWeb.coder.*."
         },
         "opencodeWeb.serverUrl": {
           "type": "string",

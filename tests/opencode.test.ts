@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { basicAuth, parseCreatedSessionId, pickLatestSession, sessionDeepLink } from '../src/core/opencode';
+import { basicAuth, chooseOpenCodeMode, parseCreatedSessionId, pickLatestSession, sessionDeepLink } from '../src/core/opencode';
+
+describe('chooseOpenCodeMode', () => {
+  it('keeps local by default and when no Coder workspace is configured', () => {
+    expect(chooseOpenCodeMode('local', 'ws')).toBe('local');
+    expect(chooseOpenCodeMode('auto', '')).toBe('local');
+  });
+
+  it('uses Coder explicitly or automatically when a workspace is set', () => {
+    expect(chooseOpenCodeMode('coder', '')).toBe('coder');
+    expect(chooseOpenCodeMode('auto', 'ws')).toBe('coder');
+  });
+});
 
 describe('basicAuth', () => {
   it('encodes opencode:<password>', () => {

@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { createResetProfile } from './core/appearance';
 import { CoderTargetError, resolveTarget } from './core/coder';
 import { choosePort } from './core/net';
-import { basicAuth } from './core/opencode';
+import { basicAuth, chooseOpenCodeMode } from './core/opencode';
 import { sleep, stripTrailingSlash } from './core/util';
 import { DSH_VIEW, DshProvider } from './providers/dsh';
 import { OPENCODE_VIEW, OpenCodeProvider } from './providers/opencode';
@@ -103,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const folder = (vscode.workspace.workspaceFolders ?? [])[0];
   const appearanceFile = prepareAppearanceFile(context);
   const syncPreferences = appearanceFile !== '' && opencodeConfig().get<boolean>('syncPreferences', false);
-  const coderMode = opencodeConfig().get<string>('mode', 'local') === 'coder';
+  const coderMode = chooseOpenCodeMode(opencodeConfig().get<string>('mode', 'local'), dshConfig().get<string>('coder.workspace', '')) === 'coder';
   const coderDirectory = opencodeConfig().get<string>('coder.directory', '');
 
   let serverUrl = stripTrailingSlash(opencodeConfig().get<string>('serverUrl', 'http://127.0.0.1:4096'));

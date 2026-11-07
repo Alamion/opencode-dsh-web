@@ -42,7 +42,7 @@ work; enable it per panel when the workspace lives in Coder.
 
 | Panel | Local (default) | Coder (optional) |
 | --- | --- | --- |
-| **OpenCode** | `opencodeWeb.mode=local` + `opencodeWeb.serverUrl` | `opencodeWeb.mode=coder` + a Coder app with slug `opencode` |
+| **OpenCode** | `opencodeWeb.mode=local` + `opencodeWeb.serverUrl` | `opencodeWeb.mode=coder` + a Coder app with slug `opencode`, or `mode=auto` |
 | **DSH** | `dshWeb.mode=local` (or `auto` without Coder) | `dshWeb.mode=coder` (or `auto` with Coder) + `harness` app (or another DSH app) |
 
 Both panels share the Coder connection settings: `dshWeb.coder.url`, `.token`,
@@ -135,7 +135,8 @@ window reload) it deep-links to the **last chat you opened** in the current
 folder, rather than the all-sessions list.
 
 Set `opencodeWeb.mode` to `coder` to use an OpenCode web UI exposed as a Coder
-workspace app. The extension starts a Coder proxy (Coder session token and app
+workspace app. `auto` uses Coder when `dshWeb.coder.workspace` is set (handy
+when both panels target the same Coder workspace) and local otherwise. The extension starts a Coder proxy (Coder session token and app
 host) and the ordinary OpenCode proxy in front of it (Basic auth and appearance
 sync). The Coder connection settings are shared with DSH:
 `dshWeb.coder.url`, `.token`, `.owner`, `.workspace`, `.appDomain`, `.agent`.
@@ -215,7 +216,7 @@ reloads; that limitation is inside DSH rather than this extension.
 | `opencodeWeb.password` | *(from service.json)* | Server password. |
 | `opencodeWeb.autoStart` | `true` | Run `opencode service start` when the server is unreachable. |
 | `opencodeWeb.deepLink` | `always` | Open the last chat: `always`, `first`, or `never`. |
-| `opencodeWeb.mode` | `local` | `local` uses `serverUrl`; `coder` uses an OpenCode Coder app. |
+| `opencodeWeb.mode` | `local` | `local` uses `serverUrl`; `coder` uses an OpenCode Coder app; `auto` picks Coder when `dshWeb.coder.workspace` is set. |
 | `opencodeWeb.coder.appSlug` | `opencode` | Coder app slug for the OpenCode web UI. |
 | `opencodeWeb.coder.directory` | `""` | Remote project directory for sessions/deep links in Coder mode. |
 | `opencodeWeb.coder.password` | `""` | OpenCode Basic password inside the Coder workspace. |
