@@ -1,9 +1,9 @@
 # OpenCode & DSH Web (Sidebar)
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Alamion.opencode-dsh-web?style=flat-square&label=marketplace&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/Alamion.opencode-dsh-web?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/Alamion.opencode-dsh-web?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
-[![GitHub stars](https://img.shields.io/github/stars/Alamion/opencode-dsh-web?style=flat-square&logo=github)](https://github.com/Alamion/opencode-dsh-web)
+[![Marketplace](https://vsmarketplacebadges.dev/version-short/Alamion.opencode-dsh-web.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/Alamion.opencode-dsh-web.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/Alamion.opencode-dsh-web.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Alamion.opencode-dsh-web)
+[![GitHub stars](https://badgen.net/github/stars/Alamion/opencode-dsh-web)](https://github.com/Alamion/opencode-dsh-web)
 [![CI](https://github.com/Alamion/opencode-dsh-web/actions/workflows/ci.yml/badge.svg)](https://github.com/Alamion/opencode-dsh-web/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.90%2B-007ACC?style=flat-square&logo=visualstudiocode)](https://code.visualstudio.com)
