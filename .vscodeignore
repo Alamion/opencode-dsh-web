@@ -1,0 +1,16 @@
+.github/**
+.github
+.vscode/**
+.idea/**
+src/**
+tests/**
+scripts/**
+node_modules/**
+coverage/
+tsconfig.json
+vitest.config.ts
+package-lock.json
+.gitignore
+AGENTS.md
+*.vsix
+*.map
