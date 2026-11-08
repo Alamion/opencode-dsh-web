@@ -5,6 +5,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish:
     name: Publish to the Marketplace
@@ -13,12 +17,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - name: Publish
-        run: npx @vscode/vsce publish --no-dependencies -p "$VSCE_PAT"
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Publish with trusted publishing
+        run: npx @vscode/vsce publish --no-dependencies --oidc
