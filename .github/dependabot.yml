@@ -5,7 +5,50 @@ updates:
     schedule:
       interval: weekly
     versioning-strategy: increase-if-necessary
+    # Fresh releases get a few days to be yanked before we see them.
+    cooldown:
+      default-days: 5
+      semver-major-days: 30
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Patch and minor updates travel together so coupled packages (vite,
+      # esbuild, vitest) never land half-updated and break `npm ci`.
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # @types/node must track the Node runtime (CI and the extension host),
+      # not the newest release.
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
+      # Compiled against engines.vscode; bumping the types without raising the
+      # engine would let the code use APIs that older VS Code lacks.
+      - dependency-name: "@types/vscode"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: monthly
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
