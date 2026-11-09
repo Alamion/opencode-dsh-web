@@ -8,7 +8,7 @@ scripts/**
 node_modules/**
 coverage/
 tsconfig.json
-vitest.config.ts
+vitest.config.mts
 package-lock.json
 .gitignore
 AGENTS.md
