@@ -368,5 +368,8 @@
     "http-proxy": "^1.18.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.5"
   }
 }
