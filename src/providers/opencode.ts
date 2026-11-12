@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { dshMessage, opencodeFrame, opencodeSetup } from '../core/html';
 import { basicAuth, OpenCodeSession, parseCreatedSessionId, pickLatestSession, sessionDeepLink } from '../core/opencode';
 import { opencodeConfig } from './settings';
+import { externalWebUrl } from '../core/webview-bridge';
 
 export const OPENCODE_VIEW = 'opencodeWeb.sidePanel';
 
@@ -11,6 +12,7 @@ interface WebviewMessage {
   type?: string;
   serverUrl?: string;
   password?: string;
+  url?: unknown;
 }
 
 /** The OpenCode web UI, pre-authenticated through the local proxy. */
@@ -61,6 +63,9 @@ export class OpenCodeProvider implements vscode.WebviewViewProvider {
         });
       } else if (message.type === 'openSettings') {
         void vscode.commands.executeCommand('workbench.action.openSettings', 'opencodeWeb');
+      } else if (message.type === 'openExternal') {
+        const url = externalWebUrl(message.url);
+        if (url) void vscode.env.openExternal(vscode.Uri.parse(url));
       }
     });
     void this.render();

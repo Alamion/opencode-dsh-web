@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-11-12
+
+### Fixed
+
+- OpenCode HTTP(S) links, including local launch URLs and popup links, open in
+  the system browser instead of being blocked inside the sidebar iframe.
+- Preserve the visible chat message when hiding/revealing the OpenCode panel
+  and when appearance synchronization reloads it in the background. Intentional
+  scrolling and bottom-follow remain available.
+- Install the iframe integration with appearance sync disabled and in the
+  fallback proxy, while retaining the upstream Content Security Policy.
+
 ## [0.1.0] - 2026-11-07
 
 ### Added

@@ -85,7 +85,7 @@ From the Marketplace search for **OpenCode & DSH Web**, or install a packaged
 build:
 
 ```bash
-code --install-extension opencode-dsh-web-0.1.0.vsix
+code --install-extension opencode-dsh-web-0.1.1.vsix
 ```
 
 ## Quick start

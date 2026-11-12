@@ -10,15 +10,14 @@ import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
 import * as httpProxy from 'http-proxy';
 import {
-  addCspHash,
   APPEARANCE_ENDPOINT,
   AppearanceProfile,
   DISABLED_SERVICE_WORKER,
-  injectAppearanceSync,
   mergeAppearanceProfile,
   normalizeAppearanceProfile,
   parseAppearanceProfile,
 } from '../core/appearance';
+import { forwardOpenCodeResponse, isDocumentRequest } from '../core/opencode-response';
 
 const target = process.env.OC_TARGET;
 const password = process.env.OC_PASSWORD || '';
@@ -42,52 +41,19 @@ const proxy = httpProxy.createProxyServer({ target, ws: true, xfwd: true, selfHa
 
 proxy.on('proxyReq', (proxyReq: any, req: http.IncomingMessage) => {
   if (auth && !proxyReq.getHeader('authorization')) proxyReq.setHeader('Authorization', auth);
-  // Keep the document response readable so the appearance script can be
-  // injected without a decompression step.
-  if (syncAppearance && isDocumentRequest(req)) proxyReq.setHeader('Accept-Encoding', 'identity');
+  // Keep HTML readable and fresh so the iframe bridge and appearance script
+  // are installed even when a previous version cached the document.
+  if (isDocumentRequest(req)) {
+    proxyReq.setHeader('Accept-Encoding', 'identity');
+    proxyReq.removeHeader('If-None-Match');
+    proxyReq.removeHeader('If-Modified-Since');
+  }
 });
 proxy.on('proxyReqWs', (proxyReq: any) => {
   if (auth) proxyReq.setHeader('Authorization', auth);
 });
 proxy.on('proxyRes', (proxyRes: http.IncomingMessage, req: http.IncomingMessage, res: http.ServerResponse) => {
-  const headers = { ...proxyRes.headers } as http.OutgoingHttpHeaders;
-  const contentType = String(headers['content-type'] ?? '').toLowerCase();
-  const contentEncoding = String(headers['content-encoding'] ?? '').toLowerCase();
-  const canInject =
-    syncAppearance &&
-    req.method === 'GET' &&
-    contentType.includes('text/html') &&
-    (contentEncoding === '' || contentEncoding === 'identity');
-
-  if (!canInject) {
-    res.writeHead(proxyRes.statusCode ?? 502, headers);
-    proxyRes.pipe(res);
-    return;
-  }
-
-  const chunks: Buffer[] = [];
-  proxyRes.on('data', (chunk: Buffer) => chunks.push(chunk));
-  proxyRes.on('end', () => {
-    try {
-      const source = Buffer.concat(chunks).toString('utf8');
-      const injected = injectAppearanceSync(source, readAppearanceProfile(), { syncPreferences });
-      delete headers['content-length'];
-      delete headers['transfer-encoding'];
-      headers['content-length'] = String(Buffer.byteLength(injected.html));
-      headers['content-security-policy'] = addCspHashToStrings(headers['content-security-policy'], injected.hash);
-      res.writeHead(proxyRes.statusCode ?? 502, headers);
-      res.end(injected.html);
-    } catch (error) {
-      process.stderr.write('appearance injection failed: ' + (error as Error).message + '\n');
-      res.writeHead(proxyRes.statusCode ?? 502, headers);
-      res.end(Buffer.concat(chunks));
-    }
-  });
-  proxyRes.on('error', (error: Error) => {
-    process.stderr.write('proxy response error: ' + error.message + '\n');
-    if (!res.headersSent) res.writeHead(502);
-    res.end();
-  });
+  forwardOpenCodeResponse(proxyRes, req, res, syncAppearance ? { profile: readAppearanceProfile(), syncPreferences } : undefined);
 });
 proxy.on('error', (error: Error, _req: unknown, res: unknown) => {
   process.stderr.write('proxy error: ' + (error && error.message) + '\n');
@@ -108,9 +74,9 @@ const server = http.createServer((req, res) => {
     handleAppearanceEvents(req, res);
     return;
   }
-  // The real Workbox worker precaches index.html and would hide the injected
-  // profile. This worker removes itself so navigation always reaches the proxy.
-  if (syncAppearance && url.pathname === '/sw.js') {
+  // The real Workbox worker precaches index.html and would hide injected scripts.
+  // This passive replacement lets navigation always reach the proxy.
+  if (url.pathname === '/sw.js') {
     res.writeHead(200, {
       'content-type': 'application/javascript; charset=utf-8',
       'cache-control': 'no-cache',
@@ -130,13 +96,6 @@ server.on('error', (error: NodeJS.ErrnoException) => {
   process.stderr.write('opencode proxy listen error: ' + error.message + '\n');
   process.exit(1);
 });
-
-function isDocumentRequest(req: http.IncomingMessage): boolean {
-  const accept = String(req.headers.accept ?? '').toLowerCase();
-  const dest = String(req.headers['sec-fetch-dest'] ?? '').toLowerCase();
-  const url = req.url ?? '/';
-  return req.method === 'GET' && (accept.includes('text/html') || dest === 'document' || url === '/' || url.startsWith('/?'));
-}
 
 function readAppearanceProfile(): AppearanceProfile {
   try {
@@ -273,12 +232,6 @@ function startAppearanceWatcher(): void {
       }
     }
   }, 25_000).unref();
-}
-
-function addCspHashToStrings(value: string | string[] | number | undefined, hash: string): string | undefined {
-  if (Array.isArray(value)) return value.map((entry) => addCspHash(String(entry), hash)).join(', ');
-  if (value === undefined) return undefined;
-  return addCspHash(String(value), hash);
 }
 
 function report(): void {

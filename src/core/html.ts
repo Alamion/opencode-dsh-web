@@ -159,7 +159,7 @@ export function opencodeFrame(proxyUrl: string, target: string): string {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${proxyUrl}; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
 <style>
   html,body{height:100%;margin:0;padding:0;background:#1e1e1e;color:#ccc;font-family:sans-serif}
-  #frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+  #frame{position:absolute;inset:0;width:100%;height:100%;border:0;visibility:hidden}
   #fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
   button{background:#0e639c;color:#fff;border:0;padding:6px 14px;cursor:pointer;border-radius:2px}
   .err{max-width:80%;text-align:center;line-height:1.5}
@@ -178,7 +178,7 @@ export function opencodeFrame(proxyUrl: string, target: string): string {
   let loaded = false;
   frame.addEventListener('load', () => {
     loaded = true;
-    frame.style.display = 'block';
+    frame.style.visibility = 'visible';
     fallback.style.display = 'none';
   });
   // if src fails (proxy dead), the load event never fires; check after a timeout
@@ -186,7 +186,20 @@ export function opencodeFrame(proxyUrl: string, target: string): string {
   function retry() { location.reload(); }
   window.addEventListener('message', (e) => {
     const m = e.data;
-    if (m && m.type === 'navigate' && m.url) { loaded = false; frame.src = m.url; }
+    if (e.source === frame.contentWindow && e.origin === ${JSON.stringify(new URL(proxyUrl).origin)}) {
+      if (m && m.type === 'opencode:openExternal' && typeof m.url === 'string') {
+        try {
+          const url = new URL(m.url);
+          if (url.protocol === 'http:' || url.protocol === 'https:') vs.postMessage({ type: 'openExternal', url: url.href });
+        } catch {}
+      }
+      return;
+    }
+    if ((!e.source || e.source === window) && m && m.type === 'navigate' && m.url) {
+      try { if (new URL(m.url).origin !== ${JSON.stringify(new URL(proxyUrl).origin)}) return; } catch { return; }
+      loaded = false;
+      frame.src = m.url;
+    }
   });
 </script>
 </body>

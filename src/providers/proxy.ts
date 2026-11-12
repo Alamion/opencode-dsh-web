@@ -4,6 +4,8 @@ import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
 import * as httpProxy from 'http-proxy';
 import { basicAuth } from '../core/opencode';
+import { DISABLED_SERVICE_WORKER } from '../core/appearance';
+import { forwardOpenCodeResponse, isDocumentRequest } from '../core/opencode-response';
 
 export interface ProxyChild {
   url: string;
@@ -115,11 +117,17 @@ export function startCoderProxyChild(
 
 /** Last-resort in-process proxy when the child cannot be spawned at all. */
 export function startOpenCodeProxyInProcess(serverUrl: string, password: string): Promise<ProxyChild> {
-  const proxy = httpProxy.createProxyServer({ target: serverUrl, ws: true, xfwd: true });
+  const proxy = httpProxy.createProxyServer({ target: serverUrl, ws: true, xfwd: true, selfHandleResponse: true });
   const auth = basicAuth(password);
-  proxy.on('proxyReq', (proxyReq: any) => {
+  proxy.on('proxyReq', (proxyReq: any, req: http.IncomingMessage) => {
     if (!proxyReq.getHeader('authorization')) proxyReq.setHeader('Authorization', auth);
+    if (isDocumentRequest(req)) {
+      proxyReq.setHeader('Accept-Encoding', 'identity');
+      proxyReq.removeHeader('If-None-Match');
+      proxyReq.removeHeader('If-Modified-Since');
+    }
   });
+  proxy.on('proxyRes', forwardOpenCodeResponse);
   proxy.on('proxyReqWs', (proxyReq: any) => proxyReq.setHeader('Authorization', auth));
   proxy.on('error', (error: Error, _req: unknown, res: unknown) => {
     const response = res as http.ServerResponse | undefined;
@@ -128,7 +136,14 @@ export function startOpenCodeProxyInProcess(serverUrl: string, password: string)
       response.end('proxy error: ' + error.message);
     }
   });
-  const server = http.createServer((req, res) => proxy.web(req, res));
+  const server = http.createServer((req, res) => {
+    if (new URL(req.url ?? '/', 'http://localhost').pathname === '/sw.js') {
+      res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-cache' });
+      res.end(DISABLED_SERVICE_WORKER);
+      return;
+    }
+    proxy.web(req, res);
+  });
   server.on('upgrade', (req, socket, head) => proxy.ws(req, socket, head));
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {

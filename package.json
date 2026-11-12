@@ -2,7 +2,7 @@
   "name": "opencode-dsh-web",
   "displayName": "OpenCode & DSH Web (Sidebar)",
   "description": "Open the OpenCode and DeepSeek Harness (DSH) web UIs in a VS Code sidebar, locally or optionally as Coder workspace apps. Pre-authenticated, at your project and last chat.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "Alamion",
   "license": "MIT",
   "author": {
